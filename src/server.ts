@@ -11,6 +11,9 @@ const ALLOWED_DOMAIN = "bayzat.com";
 const ADMIN_EMAILS = ["abdulrahman.emad@bayzat.com"];
 const SESSION_EXPIRES_IN = 5 * 24 * 60 * 60 * 1000; // 5 days
 
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "../views"));
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -26,6 +29,11 @@ app.get("/", async (req, res, next) => {
   } catch {
     next();
   }
+});
+
+// Serve login page for unauthenticated users
+app.get("/", (_req, res) => {
+  res.render("index");
 });
 
 app.use(express.static(path.join(__dirname, "../public")));
@@ -154,9 +162,9 @@ app.post("/api/logout", (_req, res) => {
 
 // Public pages — no auth required
 app.get("/pages/public/:slug", (req, res) => {
-  const filePath = path.join(__dirname, "../content/public", `${req.params.slug}.html`);
-  res.sendFile(filePath, (err) => {
+  res.render(`pages/public/${req.params.slug}`, (err: Error | null, html: string) => {
     if (err) res.status(404).send("Page not found");
+    else res.send(html);
   });
 });
 
@@ -171,13 +179,13 @@ app.get("/pages/internal/:slug", async (req, res) => {
   try {
     const decoded = await getUserFromSession(session);
     if (!decoded.email || !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
-      res.status(403).sendFile(path.join(__dirname, "../public/403.html"));
+      res.status(403).render("403");
       return;
     }
 
-    const filePath = path.join(__dirname, "../content/internal", `${req.params.slug}.html`);
-    res.sendFile(filePath, (err) => {
+    res.render(`pages/internal/${req.params.slug}`, (err: Error | null, html: string) => {
       if (err) res.status(404).send("Page not found");
+      else res.send(html);
     });
   } catch {
     res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
@@ -211,25 +219,48 @@ app.get("/pages/private/:slug", async (req, res) => {
     const allowedEmails: string[] = data?.allowedEmails || [];
 
     if (!allowedEmails.includes(decoded.email)) {
-      res.status(403).sendFile(path.join(__dirname, "../public/403.html"));
+      res.status(403).render("403");
       return;
     }
 
-    const filePath = path.join(__dirname, "../content/private", `${req.params.slug}.html`);
-    res.sendFile(filePath, (err) => {
+    res.render(`pages/private/${req.params.slug}`, (err: Error | null, html: string) => {
       if (err) res.status(404).send("Page not found");
+      else res.send(html);
     });
   } catch {
     res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
   }
 });
 
-// Dashboard — public
-app.get("/dashboard", (_req, res) => {
-  const filePath = path.join(__dirname, "../content/internal/dashboard.html");
-  res.sendFile(filePath, (err) => {
-    if (err) res.status(404).send("Page not found");
-  });
+// Dashboard
+app.get("/dashboard", async (req, res) => {
+  const session = req.cookies.session;
+  let user = { authenticated: false, email: null as string | null, isEmployee: false, isAdmin: false };
+
+  if (session) {
+    try {
+      const decoded = await getUserFromSession(session);
+      const email = decoded.email || null;
+      user = {
+        authenticated: true,
+        email,
+        isEmployee: !!email && email.endsWith("@" + ALLOWED_DOMAIN),
+        isAdmin: !!email && ADMIN_EMAILS.includes(email),
+      };
+    } catch {}
+  }
+
+  let accessEntries: { slug: string; allowedEmails: string[] }[] = [];
+  if (user.isAdmin) {
+    try {
+      const snapshot = await db.collection("pageAccess").get();
+      snapshot.forEach((doc) => {
+        accessEntries.push({ slug: doc.id, allowedEmails: doc.data().allowedEmails || [] });
+      });
+    } catch {}
+  }
+
+  res.render("pages/internal/dashboard", { user, accessEntries });
 });
 
 app.listen(PORT, () => {
