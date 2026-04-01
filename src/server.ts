@@ -8,6 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const ALLOWED_DOMAIN = "bayzat.com";
+const ADMIN_EMAILS = ["abdulrahman.emad@bayzat.com"];
 const SESSION_EXPIRES_IN = 5 * 24 * 60 * 60 * 1000; // 5 days
 
 app.use(express.json());
@@ -65,6 +66,82 @@ app.post("/api/login", async (req, res) => {
   } catch (error) {
     console.error("Login error:", error instanceof Error ? error.message : error);
     res.status(401).json({ error: "Invalid token" });
+  }
+});
+
+app.get("/api/me", async (req, res) => {
+  const session = req.cookies.session;
+  if (!session) {
+    res.json({ authenticated: false });
+    return;
+  }
+
+  try {
+    const decoded = await getUserFromSession(session);
+    const email = decoded.email || null;
+    const isEmployee = !!email && email.endsWith("@" + ALLOWED_DOMAIN);
+    const isAdmin = !!email && ADMIN_EMAILS.includes(email);
+    res.json({ authenticated: true, email, isEmployee, isAdmin });
+  } catch {
+    res.json({ authenticated: false });
+  }
+});
+
+// Admin: list all page access entries
+app.get("/api/admin/page-access", async (req, res) => {
+  const session = req.cookies.session;
+  if (!session) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  try {
+    const decoded = await getUserFromSession(session);
+    if (!decoded.email || !ADMIN_EMAILS.includes(decoded.email)) {
+      res.status(403).json({ error: "Not authorized" });
+      return;
+    }
+
+    const snapshot = await db.collection("pageAccess").get();
+    const entries: { slug: string; allowedEmails: string[] }[] = [];
+    snapshot.forEach((doc) => {
+      entries.push({ slug: doc.id, allowedEmails: doc.data().allowedEmails || [] });
+    });
+    res.json(entries);
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Admin: grant or revoke email access to a page
+app.post("/api/admin/page-access", async (req, res) => {
+  const session = req.cookies.session;
+  if (!session) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  try {
+    const decoded = await getUserFromSession(session);
+    if (!decoded.email || !ADMIN_EMAILS.includes(decoded.email)) {
+      res.status(403).json({ error: "Not authorized" });
+      return;
+    }
+
+    const { slug, email, action } = req.body;
+    if (!slug || !email || !["grant", "revoke"].includes(action)) {
+      res.status(400).json({ error: "Missing slug, email, or action (grant/revoke)" });
+      return;
+    }
+
+    const docRef = db.collection("pageAccess").doc(slug);
+    const doc = await docRef.get();
+    let allowedEmails: string[] = doc.exists ? (doc.data()?.allowedEmails || []) : [];
+
+    if (action === "grant" && !allowedEmails.includes(email)) {
+      allowedEmails.push(email);
+    } else if (action === "revoke") {
+      allowedEmails = allowedEmails.filter((e: string) => e !== email);
+    }
+
+    await docRef.set({ allowedEmails }, { merge: true });
+    res.json({ slug, allowedEmails });
+  } catch {
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -147,28 +224,12 @@ app.get("/pages/private/:slug", async (req, res) => {
   }
 });
 
-// Dashboard — internal only
-app.get("/dashboard", async (req, res) => {
-  const session = req.cookies.session;
-  if (!session) {
-    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
-    return;
-  }
-
-  try {
-    const decoded = await getUserFromSession(session);
-    if (!decoded.email || !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
-      res.status(403).sendFile(path.join(__dirname, "../public/403.html"));
-      return;
-    }
-
-    const filePath = path.join(__dirname, "../content/internal/dashboard.html");
-    res.sendFile(filePath, (err) => {
-      if (err) res.status(404).send("Page not found");
-    });
-  } catch {
-    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
-  }
+// Dashboard — public
+app.get("/dashboard", (_req, res) => {
+  const filePath = path.join(__dirname, "../content/internal/dashboard.html");
+  res.sendFile(filePath, (err) => {
+    if (err) res.status(404).send("Page not found");
+  });
 });
 
 app.listen(PORT, () => {

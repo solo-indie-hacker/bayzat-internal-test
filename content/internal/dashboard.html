@@ -7,39 +7,251 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f9fafb; }
-    header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 2rem; background: white; border-bottom: 1px solid #e5e7eb; }
+    header { background: white; border-bottom: 1px solid #e5e7eb; }
+    .header-top { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 2rem; }
     .logo { font-size: 1.5rem; font-weight: 900; letter-spacing: 0.2em; color: #7c3aed; }
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+    .user-email { font-size: 0.875rem; color: #6b7280; }
     .logout-btn { padding: 0.5rem 1rem; border: 1px solid #7c3aed; border-radius: 0.375rem; background: transparent; color: #7c3aed; font-size: 0.875rem; cursor: pointer; transition: all 0.15s; }
     .logout-btn:hover { background: #7c3aed; color: white; }
+    .login-btn { padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; background: #7c3aed; color: white; font-size: 0.875rem; cursor: pointer; transition: all 0.15s; }
+    .login-btn:hover { background: #6d28d9; }
+    .tabs { display: none; padding: 0 2rem; gap: 0; }
+    .tabs.visible { display: flex; }
+    .tab { padding: 0.75rem 1.25rem; font-size: 0.875rem; font-weight: 500; color: #6b7280; cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab:hover { color: #1f2937; }
+    .tab.active { color: #7c3aed; border-bottom-color: #7c3aed; }
     main { max-width: 960px; margin: 0 auto; padding: 2.5rem 2rem; }
     h1 { font-size: 1.875rem; font-weight: 600; margin-bottom: 0.5rem; }
     .subtitle { color: #6b7280; margin-bottom: 2rem; }
     .card { background: white; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1.75rem; margin-bottom: 1rem; }
-    .card h2 { font-size: 1.125rem; font-weight: 600; color: #1f2937; margin-bottom: 1.25rem; }
+    .card h2 { font-size: 1.125rem; font-weight: 600; color: #1f2937; margin-bottom: 0.5rem; }
     .card p { color: #4b5563; line-height: 1.6; }
+    .card-link { display: inline-block; margin-top: 0.75rem; color: #7c3aed; font-weight: 500; text-decoration: none; }
+    .card-link:hover { text-decoration: underline; }
+    .hidden { display: none; }
+
+    /* Admin styles */
+    .form-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+    .form-row input, .form-row select { flex: 1; padding: 0.625rem 0.875rem; border: 1px solid #e5e7eb; border-radius: 0.375rem; font-size: 0.875rem; }
+    .form-row input:focus, .form-row select:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1); }
+    .btn-grant { padding: 0.625rem 1.25rem; border: none; border-radius: 0.375rem; background: #7c3aed; color: white; font-size: 0.875rem; font-weight: 500; cursor: pointer; white-space: nowrap; }
+    .btn-grant:hover { background: #6d28d9; }
+    .btn-grant:disabled { opacity: 0.5; cursor: not-allowed; }
+    .access-list { margin-top: 1.25rem; }
+    .access-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #f3f4f6; }
+    .access-item:last-child { border-bottom: none; }
+    .access-slug { font-weight: 600; color: #1f2937; font-size: 0.875rem; }
+    .access-email { color: #6b7280; font-size: 0.875rem; }
+    .btn-revoke { padding: 0.375rem 0.75rem; border: 1px solid #ef4444; border-radius: 0.375rem; background: transparent; color: #ef4444; font-size: 0.75rem; cursor: pointer; }
+    .btn-revoke:hover { background: #ef4444; color: white; }
+    .empty-state { text-align: center; padding: 2rem; color: #9ca3af; }
+    .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; color: white; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .toast.success { background: #059669; }
+    .toast.error { background: #dc2626; }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
   <header>
-    <div class="logo">BAYZAT</div>
-    <button class="logout-btn" onclick="handleLogout()">Log out</button>
+    <div class="header-top">
+      <div class="logo">BAYZAT</div>
+      <div class="header-right">
+        <span class="user-email" id="userEmail"></span>
+        <button class="logout-btn hidden" id="logoutBtn" onclick="handleLogout()">Log out</button>
+        <a class="login-btn hidden" id="loginBtn" href="/?redirect=/dashboard">Log in</a>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="pages" onclick="switchTab('pages')">Pages</button>
+      <button class="tab" data-tab="admin" onclick="switchTab('admin')">Manage Access</button>
+    </nav>
   </header>
-  <main>
+
+  <!-- Pages Tab -->
+  <main id="tab-pages">
     <h1>Dashboard</h1>
-    <p class="subtitle">Welcome back</p>
+    <p class="subtitle">Browse available content</p>
 
     <div class="card">
-      <h2>Internal Content</h2>
-      <p>This page is only served to authenticated @bayzat.com users.</p>
-      <p>The HTML is protected server-side — it is never sent to unauthorized users.</p>
+      <h2>Public Pages</h2>
+      <p>Open to everyone — no sign-in required.</p>
+      <a class="card-link" href="/pages/public/sample">Sample Public Page</a>
+    </div>
+
+    <div class="card hidden" id="internalSection">
+      <h2>Internal Pages</h2>
+      <p>Restricted to @bayzat.com accounts.</p>
+      <a class="card-link" href="/pages/internal/sample">Sample Internal Page</a>
+    </div>
+
+    <div class="card hidden" id="privateSection">
+      <h2>Private Pages</h2>
+      <p>Per-user access — only allowed users can view.</p>
+      <a class="card-link" href="/pages/private/client">Client Page</a>
     </div>
   </main>
 
+  <!-- Admin Tab -->
+  <main id="tab-admin" class="hidden">
+    <h1>Manage Access</h1>
+    <p class="subtitle">Grant or revoke access to private pages</p>
+
+    <div class="card">
+      <h2>Grant Access</h2>
+      <div class="form-row">
+        <input type="text" id="slugInput" placeholder="Page slug (e.g. client)" />
+        <input type="email" id="emailInput" placeholder="Email address" />
+        <button class="btn-grant" id="grantBtn" onclick="grantAccess()">Grant</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Current Access</h2>
+      <div id="accessList" class="access-list">
+        <div class="empty-state">Loading...</div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
   <script>
+    let currentUser = null;
+
+    async function init() {
+      try {
+        const res = await fetch("/api/me");
+        currentUser = await res.json();
+      } catch {
+        currentUser = { authenticated: false };
+      }
+
+      const emailEl = document.getElementById("userEmail");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const loginBtn = document.getElementById("loginBtn");
+
+      if (currentUser.authenticated) {
+        emailEl.textContent = currentUser.email;
+        logoutBtn.classList.remove("hidden");
+
+        // Show internal section for employees
+        if (currentUser.isEmployee) {
+          document.getElementById("internalSection").classList.remove("hidden");
+          document.getElementById("privateSection").classList.remove("hidden");
+        }
+
+        // Show admin tabs
+        if (currentUser.isAdmin) {
+          document.getElementById("tabs").classList.add("visible");
+          loadAccessList();
+        }
+      } else {
+        loginBtn.classList.remove("hidden");
+      }
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelector(`[data-tab="${tab}"]`).classList.add("active");
+      document.getElementById("tab-pages").classList.toggle("hidden", tab !== "pages");
+      document.getElementById("tab-admin").classList.toggle("hidden", tab !== "admin");
+      if (tab === "admin") loadAccessList();
+    }
+
+    async function loadAccessList() {
+      const container = document.getElementById("accessList");
+      try {
+        const res = await fetch("/api/admin/page-access");
+        const entries = await res.json();
+
+        if (!entries.length) {
+          container.innerHTML = '<div class="empty-state">No access entries yet</div>';
+          return;
+        }
+
+        let html = "";
+        for (const entry of entries) {
+          for (const email of entry.allowedEmails) {
+            html += `
+              <div class="access-item">
+                <div>
+                  <span class="access-slug">/pages/private/${entry.slug}</span>
+                  <span class="access-email"> — ${email}</span>
+                </div>
+                <button class="btn-revoke" onclick="revokeAccess('${entry.slug}', '${email}')">Revoke</button>
+              </div>`;
+          }
+        }
+        container.innerHTML = html || '<div class="empty-state">No access entries yet</div>';
+      } catch {
+        container.innerHTML = '<div class="empty-state">Failed to load</div>';
+      }
+    }
+
+    async function grantAccess() {
+      const slug = document.getElementById("slugInput").value.trim();
+      const email = document.getElementById("emailInput").value.trim();
+      if (!slug || !email) return;
+
+      const btn = document.getElementById("grantBtn");
+      btn.disabled = true;
+
+      try {
+        const res = await fetch("/api/admin/page-access", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug, email, action: "grant" }),
+        });
+
+        if (res.ok) {
+          showToast("Access granted", "success");
+          document.getElementById("slugInput").value = "";
+          document.getElementById("emailInput").value = "";
+          loadAccessList();
+        } else {
+          const data = await res.json();
+          showToast(data.error || "Failed", "error");
+        }
+      } catch {
+        showToast("Request failed", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function revokeAccess(slug, email) {
+      try {
+        const res = await fetch("/api/admin/page-access", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug, email, action: "revoke" }),
+        });
+
+        if (res.ok) {
+          showToast("Access revoked", "success");
+          loadAccessList();
+        } else {
+          showToast("Failed to revoke", "error");
+        }
+      } catch {
+        showToast("Request failed", "error");
+      }
+    }
+
+    function showToast(msg, type) {
+      const toast = document.getElementById("toast");
+      toast.textContent = msg;
+      toast.className = `toast ${type} show`;
+      setTimeout(() => toast.classList.remove("show"), 2500);
+    }
+
     async function handleLogout() {
       await fetch("/api/logout", { method: "POST" });
       window.location.href = "/";
     }
+
+    init();
   </script>
 </body>
 </html>
