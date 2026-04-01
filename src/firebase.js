@@ -13,3 +13,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const provider = new GoogleAuthProvider();
+export const ALLOWED_DOMAIN = 'bayzat.com';
+
+export function isAllowedEmail(email) {
+  return email && email.endsWith('@' + ALLOWED_DOMAIN);
+}

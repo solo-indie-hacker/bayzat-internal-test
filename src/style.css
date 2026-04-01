@@ -55,6 +55,16 @@
   margin-bottom: 8px;
 }
 
+.error-msg {
+  color: #dc2626;
+  font-size: 14px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+}
+
 .divider {
   display: flex;
   align-items: center;
