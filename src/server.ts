@@ -32,12 +32,7 @@ app.post("/api/login", async (req, res) => {
   }
 
   try {
-    const decoded = await adminAuth.verifyIdToken(idToken);
-
-    if (!decoded.email || !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
-      res.status(403).json({ error: "Access restricted to @bayzat.com emails" });
-      return;
-    }
+    await adminAuth.verifyIdToken(idToken);
 
     const sessionCookie = await adminAuth.createSessionCookie(idToken, {
       expiresIn: SESSION_EXPIRES_IN,
@@ -84,7 +79,7 @@ app.get("/pages/internal/:slug", async (req, res) => {
   try {
     const decoded = await getUserFromSession(session);
     if (!decoded.email || !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
-      res.redirect("/");
+      res.status(403).send("Access restricted to @bayzat.com emails");
       return;
     }
 
@@ -148,7 +143,7 @@ app.get("/dashboard", async (req, res) => {
   try {
     const decoded = await getUserFromSession(session);
     if (!decoded.email || !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
-      res.redirect("/");
+      res.status(403).send("Access restricted to @bayzat.com emails");
       return;
     }
 
