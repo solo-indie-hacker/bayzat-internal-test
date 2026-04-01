@@ -7,7 +7,15 @@
     <title>bayzat-internal</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <h1>Welcome!</h1>
+      <button id="google-login-button">Sign in with Google</button>
+      <button id="logout-button" style="display:none;">Logout</button>
+      <div id="user-info" style="display:none;">
+        <p>Welcome, <span id="user-name"></span>!</p>
+        <p>Email: <span id="user-email"></span></p>
+      </div>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
