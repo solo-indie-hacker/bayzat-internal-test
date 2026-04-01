@@ -76,7 +76,9 @@
         });
 
         if (res.ok) {
-          window.location.href = "/dashboard";
+          const params = new URLSearchParams(window.location.search);
+          const redirect = params.get("redirect");
+          window.location.href = redirect && redirect.startsWith("/") ? redirect : "/dashboard";
         } else {
           const data = await res.json();
           errorEl.textContent = data.error || "Login failed";

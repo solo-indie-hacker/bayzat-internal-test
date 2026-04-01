@@ -12,6 +12,21 @@ const SESSION_EXPIRES_IN = 5 * 24 * 60 * 60 * 1000; // 5 days
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Redirect logged-in users away from the login page
+app.get("/", async (req, res, next) => {
+  const session = req.cookies.session;
+  if (!session) return next();
+
+  try {
+    await getUserFromSession(session);
+    const redirect = req.query.redirect;
+    res.redirect(typeof redirect === "string" && redirect.startsWith("/") ? redirect : "/dashboard");
+  } catch {
+    next();
+  }
+});
+
 app.use(express.static(path.join(__dirname, "../public")));
 
 // ── Helper: get user from session cookie ──
@@ -72,14 +87,14 @@ app.get("/pages/public/:slug", (req, res) => {
 app.get("/pages/internal/:slug", async (req, res) => {
   const session = req.cookies.session;
   if (!session) {
-    res.redirect("/");
+    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
     return;
   }
 
   try {
     const decoded = await getUserFromSession(session);
     if (!decoded.email || !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
-      res.status(403).send("Access restricted to @bayzat.com emails");
+      res.status(403).sendFile(path.join(__dirname, "../public/403.html"));
       return;
     }
 
@@ -88,7 +103,7 @@ app.get("/pages/internal/:slug", async (req, res) => {
       if (err) res.status(404).send("Page not found");
     });
   } catch {
-    res.redirect("/");
+    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
   }
 });
 
@@ -96,14 +111,14 @@ app.get("/pages/internal/:slug", async (req, res) => {
 app.get("/pages/private/:slug", async (req, res) => {
   const session = req.cookies.session;
   if (!session) {
-    res.redirect("/");
+    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
     return;
   }
 
   try {
     const decoded = await getUserFromSession(session);
     if (!decoded.email) {
-      res.redirect("/");
+      res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
       return;
     }
 
@@ -119,7 +134,7 @@ app.get("/pages/private/:slug", async (req, res) => {
     const allowedEmails: string[] = data?.allowedEmails || [];
 
     if (!allowedEmails.includes(decoded.email)) {
-      res.status(403).send("You do not have access to this page");
+      res.status(403).sendFile(path.join(__dirname, "../public/403.html"));
       return;
     }
 
@@ -128,7 +143,7 @@ app.get("/pages/private/:slug", async (req, res) => {
       if (err) res.status(404).send("Page not found");
     });
   } catch {
-    res.redirect("/");
+    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
   }
 });
 
@@ -136,14 +151,14 @@ app.get("/pages/private/:slug", async (req, res) => {
 app.get("/dashboard", async (req, res) => {
   const session = req.cookies.session;
   if (!session) {
-    res.redirect("/");
+    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
     return;
   }
 
   try {
     const decoded = await getUserFromSession(session);
     if (!decoded.email || !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
-      res.status(403).send("Access restricted to @bayzat.com emails");
+      res.status(403).sendFile(path.join(__dirname, "../public/403.html"));
       return;
     }
 
@@ -152,7 +167,7 @@ app.get("/dashboard", async (req, res) => {
       if (err) res.status(404).send("Page not found");
     });
   } catch {
-    res.redirect("/");
+    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
   }
 });
 
