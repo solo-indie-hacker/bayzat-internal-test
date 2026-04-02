@@ -79,17 +79,11 @@
     <h1>Dashboard</h1>
     <p class="subtitle">Browse available content</p>
 
-    <div class="card">
-      <h2>Public Pages</h2>
-      <p>Open to everyone — no sign-in required.</p>
-      <a class="card-link" href="/pages/public/sample">Sample Public Page</a>
-    </div>
-
     <% if (user.isEmployee) { %>
       <div class="card">
         <h2>Internal Pages</h2>
         <p>Restricted to @bayzat.com accounts.</p>
-        <a class="card-link" href="/sample">Sample Internal Page</a>
+        <a class="card-link" href="/new-page">Sample Internal Page</a>
       </div>
 
       <div class="card">

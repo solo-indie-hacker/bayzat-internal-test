@@ -297,44 +297,34 @@ app.get("/:slug", async (req, res) => {
     const slug = req.params.slug;
     const doc = await db.collection("pageAccess").doc(slug).get();
 
-    if (doc.exists) {
-      // Private page
-      if (!isAdmin) {
-        const data = doc.data();
-        const accessType = data?.accessType || "client";
-        const allowed =
-          accessType === "internal"
-            ? decoded.email.endsWith("@" + ALLOWED_DOMAIN)
-            : (data?.allowedEmails || []).includes(decoded.email);
+    if (!doc.exists) {
+      res.status(404).send("Page not found");
+      return;
+    }
 
-        if (!allowed) {
-          res.status(403).render("403");
-          return;
-        }
-      }
+    const data = doc.data();
+    const accessType = data?.accessType || "client";
 
-      res.render(
-        `pages/private/${slug}`,
-        (err: Error | null, html: string) => {
-          if (err) res.status(404).send("Page not found");
-          else res.send(html);
-        },
-      );
-    } else {
-      // Internal page — @bayzat.com only (admins always pass)
-      if (!isAdmin && !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
+    if (!isAdmin) {
+      const allowed =
+        accessType === "internal"
+          ? decoded.email.endsWith("@" + ALLOWED_DOMAIN)
+          : (data?.allowedEmails || []).includes(decoded.email);
+
+      if (!allowed) {
         res.status(403).render("403");
         return;
       }
-
-      res.render(
-        `pages/internal/${slug}`,
-        (err: Error | null, html: string) => {
-          if (err) res.status(404).send("Page not found");
-          else res.send(html);
-        },
-      );
     }
+
+    const folder = accessType === "internal" ? "pages/internal" : "pages/private";
+    res.render(
+      `${folder}/${slug}`,
+      (err: Error | null, html: string) => {
+        if (err) res.status(404).send("Page not found");
+        else res.send(html);
+      },
+    );
   } catch {
     res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
   }
