@@ -89,13 +89,13 @@
       <div class="card">
         <h2>Internal Pages</h2>
         <p>Restricted to @bayzat.com accounts.</p>
-        <a class="card-link" href="/pages/internal/sample">Sample Internal Page</a>
+        <a class="card-link" href="/sample">Sample Internal Page</a>
       </div>
 
       <div class="card">
         <h2>Private Pages</h2>
         <p>Per-user access — only allowed users can view.</p>
-        <a class="card-link" href="/pages/private/client">Client Page</a>
+        <a class="card-link" href="/client">Client Page</a>
       </div>
     <% } %>
   </main>
@@ -134,7 +134,7 @@
               <% if (entry.accessType === 'internal') { %>
                 <div class="access-item">
                   <div>
-                    <span class="access-slug">/pages/private/<%= entry.slug %></span>
+                    <span class="access-slug">/<%= entry.slug %></span>
                     <span class="access-badge internal">Internal</span>
                   </div>
                   <button class="btn-revoke" onclick="revokeAccess('<%= entry.slug %>', null)">Revoke</button>
@@ -143,7 +143,7 @@
                 <% for (const email of entry.allowedEmails) { %>
                   <div class="access-item">
                     <div>
-                      <span class="access-slug">/pages/private/<%= entry.slug %></span>
+                      <span class="access-slug">/<%= entry.slug %></span>
                       <span class="access-email"> — <%= email %></span>
                     </div>
                     <button class="btn-revoke" onclick="revokeAccess('<%= entry.slug %>', '<%= email %>')">Revoke</button>

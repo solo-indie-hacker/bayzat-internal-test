@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 // Used for internal pages
 const ALLOWED_DOMAIN = "bayzat.com";
 
-const ADMIN_EMAILS = ["abdulrahman.emad@bayzat.com"];
+const ADMIN_EMAILS = ["abdulrahman.emad@bayzat.com", "abdulrahman.albaba@bayzat.com"];
 const SESSION_EXPIRES_IN = 5 * 24 * 60 * 60 * 1000; // 5 days
 
 app.set("view engine", "ejs");
@@ -229,78 +229,6 @@ app.post("/api/logout", (_req, res) => {
 });
 
 // ── Page Routes ──
-// Internal pages — @bayzat.com only
-app.get("/pages/internal/:slug", async (req, res) => {
-  const session = req.cookies.session;
-  if (!session) {
-    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
-    return;
-  }
-
-  try {
-    const decoded = await getUserFromSession(session);
-    if (!decoded.email || !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
-      res.status(403).render("403");
-      return;
-    }
-
-    res.render(
-      `pages/internal/${req.params.slug}`,
-      (err: Error | null, html: string) => {
-        if (err) res.status(404).send("Page not found");
-        else res.send(html);
-      },
-    );
-  } catch {
-    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
-  }
-});
-
-// Private pages — per-user access via Firestore
-app.get("/pages/private/:slug", async (req, res) => {
-  const session = req.cookies.session;
-  if (!session) {
-    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
-    return;
-  }
-
-  try {
-    const decoded = await getUserFromSession(session);
-    if (!decoded.email) {
-      res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
-      return;
-    }
-
-    const doc = await db.collection("pageAccess").doc(req.params.slug).get();
-
-    if (!doc.exists) {
-      res.status(404).send("Page not found");
-      return;
-    }
-
-    const data = doc.data();
-    const accessType = data?.accessType || "client";
-    const allowed =
-      accessType === "internal"
-        ? decoded.email.endsWith("@" + ALLOWED_DOMAIN)
-        : (data?.allowedEmails || []).includes(decoded.email);
-
-    if (!allowed) {
-      res.status(403).render("403");
-      return;
-    }
-
-    res.render(
-      `pages/private/${req.params.slug}`,
-      (err: Error | null, html: string) => {
-        if (err) res.status(404).send("Page not found");
-        else res.send(html);
-      },
-    );
-  } catch {
-    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
-  }
-});
 
 // Dashboard
 app.get("/dashboard", async (req, res) => {
@@ -345,6 +273,71 @@ app.get("/dashboard", async (req, res) => {
   }
 
   res.render("pages/internal/dashboard", { user, accessEntries });
+});
+
+// All other pages — access determined by Firestore doc existence:
+//   - doc exists → private page (per-user or internal access type)
+//   - no doc     → internal page (@bayzat.com only)
+// Admins bypass all access checks.
+app.get("/:slug", async (req, res) => {
+  const session = req.cookies.session;
+  if (!session) {
+    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
+    return;
+  }
+
+  try {
+    const decoded = await getUserFromSession(session);
+    if (!decoded.email) {
+      res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
+      return;
+    }
+
+    const isAdmin = ADMIN_EMAILS.includes(decoded.email);
+    const slug = req.params.slug;
+    const doc = await db.collection("pageAccess").doc(slug).get();
+
+    if (doc.exists) {
+      // Private page
+      if (!isAdmin) {
+        const data = doc.data();
+        const accessType = data?.accessType || "client";
+        const allowed =
+          accessType === "internal"
+            ? decoded.email.endsWith("@" + ALLOWED_DOMAIN)
+            : (data?.allowedEmails || []).includes(decoded.email);
+
+        if (!allowed) {
+          res.status(403).render("403");
+          return;
+        }
+      }
+
+      res.render(
+        `pages/private/${slug}`,
+        (err: Error | null, html: string) => {
+          if (err) res.status(404).send("Page not found");
+          else res.send(html);
+        },
+      );
+    } else {
+      // Internal page — @bayzat.com only (admins always pass)
+      if (!isAdmin && !decoded.email.endsWith("@" + ALLOWED_DOMAIN)) {
+        res.status(403).render("403");
+        return;
+      }
+
+      res.render(
+        `pages/internal/${slug}`,
+        (err: Error | null, html: string) => {
+          if (err) res.status(404).send("Page not found");
+          else res.send(html);
+        },
+      );
+    }
+  } catch {
+    res.redirect(`/?redirect=${encodeURIComponent(req.originalUrl)}`);
+  }
 });
 
 app.listen(PORT, () => {
