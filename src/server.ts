@@ -135,14 +135,14 @@ app.get("/api/admin/page-access", async (req, res) => {
     const snapshot = await db.collection("pageAccess").get();
     const entries: {
       slug: string;
-      accessType: string;
+      internal: boolean;
       allowedEmails: string[];
     }[] = [];
     snapshot.forEach((doc) => {
       const data = doc.data();
       entries.push({
         slug: doc.id,
-        accessType: data.accessType || "client",
+        internal: data.internal === true || data.accessType === "internal",
         allowedEmails: data.allowedEmails || [],
       });
     });
@@ -175,6 +175,12 @@ app.post("/api/admin/page-access", async (req, res) => {
 
     const docRef = db.collection("pageAccess").doc(slug);
 
+    const doc = await docRef.get();
+    const existing = doc.exists ? doc.data()! : {};
+    const existingEmails: string[] = existing.allowedEmails || [];
+    const existingInternal: boolean =
+      existing.internal === true || existing.accessType === "internal";
+
     if (action === "grant") {
       if (!accessType || !["client", "internal"].includes(accessType)) {
         res
@@ -184,7 +190,7 @@ app.post("/api/admin/page-access", async (req, res) => {
       }
 
       if (accessType === "internal") {
-        await docRef.set({ accessType: "internal", allowedEmails: [] });
+        await docRef.set({ internal: true, allowedEmails: existingEmails });
       } else {
         if (!email) {
           res
@@ -192,22 +198,26 @@ app.post("/api/admin/page-access", async (req, res) => {
             .json({ error: "Email is required for client access" });
           return;
         }
-        const doc = await docRef.get();
-        const existing = doc.exists ? doc.data()?.allowedEmails || [] : [];
-        if (!existing.includes(email)) existing.push(email);
-        await docRef.set({ accessType: "client", allowedEmails: existing });
+        const newEmails = existingEmails.includes(email)
+          ? existingEmails
+          : [...existingEmails, email];
+        await docRef.set({ internal: existingInternal, allowedEmails: newEmails });
       }
     } else {
-      // Revoke: if email is provided, remove that email; otherwise remove the whole entry
+      // Revoke: email provided → remove that email; no email → remove internal flag
+      let allowedEmails = existingEmails;
+      let internal = existingInternal;
+
       if (email) {
-        const doc = await docRef.get();
-        let allowedEmails: string[] = doc.exists
-          ? doc.data()?.allowedEmails || []
-          : [];
         allowedEmails = allowedEmails.filter((e: string) => e !== email);
-        await docRef.set({ accessType: "client", allowedEmails });
       } else {
+        internal = false;
+      }
+
+      if (!internal && allowedEmails.length === 0) {
         await docRef.delete();
+      } else {
+        await docRef.set({ internal, allowedEmails });
       }
     }
 
@@ -216,7 +226,7 @@ app.post("/api/admin/page-access", async (req, res) => {
       slug,
       ...(updated.exists
         ? updated.data()
-        : { accessType: null, allowedEmails: [] }),
+        : { internal: false, allowedEmails: [] }),
     });
   } catch {
     res.status(500).json({ error: "Server error" });
@@ -255,7 +265,7 @@ app.get("/dashboard", async (req, res) => {
 
   let accessEntries: {
     slug: string;
-    accessType: string;
+    internal: boolean;
     allowedEmails: string[];
   }[] = [];
   if (user.isAdmin) {
@@ -265,7 +275,7 @@ app.get("/dashboard", async (req, res) => {
         const data = doc.data();
         accessEntries.push({
           slug: doc.id,
-          accessType: data.accessType || "client",
+          internal: data.internal === true || data.accessType === "internal",
           allowedEmails: data.allowedEmails || [],
         });
       });
@@ -303,13 +313,13 @@ app.get("/:slug", async (req, res) => {
     }
 
     const data = doc.data();
-    const accessType = data?.accessType || "client";
+    const isInternal = data?.internal === true || data?.accessType === "internal";
+    const allowedEmails: string[] = data?.allowedEmails || [];
 
     if (!isAdmin) {
       const allowed =
-        accessType === "internal"
-          ? decoded.email.endsWith("@" + ALLOWED_DOMAIN)
-          : (data?.allowedEmails || []).includes(decoded.email);
+        (isInternal && decoded.email.endsWith("@" + ALLOWED_DOMAIN)) ||
+        allowedEmails.includes(decoded.email);
 
       if (!allowed) {
         res.status(403).render("403");
@@ -317,7 +327,7 @@ app.get("/:slug", async (req, res) => {
       }
     }
 
-    const folder = accessType === "internal" ? "pages/internal" : "pages/private";
+    const folder = isInternal ? "pages/internal" : "pages/private";
     res.render(
       `${folder}/${slug}`,
       (err: Error | null, html: string) => {
